@@ -658,8 +658,16 @@ df = load_dataset(
     sample_path.stat().st_mtime if sample_path else 0,
 )
 runs = get_runs()
-health, health_error = api_get("/api/health")
-models, models_error = api_get("/api/models")
+MODEL_CHECKPOINT_READY = CHECKPOINT_PATH.is_file()
+health = {
+    "status": "ready",
+    "engine": "local_lstm",
+    "model": "lstm",
+    "device": "cpu",
+} if MODEL_CHECKPOINT_READY else None
+health_error = None if MODEL_CHECKPOINT_READY else f"Missing checkpoint: {CHECKPOINT_PATH}"
+models = {"models": [{"name": "lstm", "modality": "text", "status": "ready"}]} if MODEL_CHECKPOINT_READY else None
+models_error = health_error
 comparison = read_json(ARTIFACTS / "comparison.json")
 comp_rows = comparison.get("models", comparison.get("results", [])) if isinstance(comparison, dict) else comparison
 if not isinstance(comp_rows, list):
@@ -1144,12 +1152,12 @@ with st.sidebar:
 
     if health:
         st.markdown(
-            "<span style='color:#45dec6;font-weight:700'>? API Connected</span>",
+            "<span style='color:#45dec6;font-weight:700'>LSTM ENGINE READY</span>",
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            "<span style='color:#ff647c;font-weight:700'>? API Offline</span>",
+            "<span style='color:#ff647c;font-weight:700'>MODEL NOT FOUND</span>",
             unsafe_allow_html=True,
         )
 
@@ -1163,7 +1171,7 @@ header_left, header_right = st.columns([5, 1], vertical_alignment="center")
 with header_left:
     st.markdown(
         f"<div class='topbar'><span>Workspace / <b style='color:#172544'>{page}</b></span>"
-        f"<span style='color:{'#159b79' if health else '#d65b70'};font-weight:800'>API {'ONLINE' if health else 'OFFLINE'}</span></div>",
+        f"<span style='color:{'#159b79' if health else '#d65b70'};font-weight:800'>LSTM {'READY' if health else 'UNAVAILABLE'}</span></div>",
         unsafe_allow_html=True,
     )
 st.markdown("<div class='eyebrow'>MULTIMODAL INTELLIGENCE PLATFORM</div>", unsafe_allow_html=True)
@@ -1174,10 +1182,10 @@ st.markdown("<div class='page-subtitle'>Your neural systems, experiments and inf
 # -------------------- OVERVIEW --------------------
 if page == "Overview":
     c1, c2, c3, c4 = st.columns(4, gap="medium")
-    metric(c1, "SYSTEM STATUS", "ONLINE" if health else "OFFLINE", "API connection")
+    metric(c1, "SYSTEM STATUS", "READY" if health else "UNAVAILABLE", "Local LSTM inference")
     metric(c2, "ARCHITECTURES", str(len(architecture)), "Registered neural models")
     metric(c3, "TRAINING RUNS", str(len(runs)), "Recorded experiments")
-    metric(c4, "COMPUTE DEVICE", str((health or {}).get("device", "ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â")).upper(), "Inference environment")
+    metric(c4, "COMPUTE DEVICE", "CPU", "Inference environment")
 
     section("Neural Architecture Registry", "01 / MODEL CATALOG")
     cards = st.columns(3, gap="medium")
@@ -1513,20 +1521,20 @@ elif page == "Training Monitor":
 # -------------------- DIAGNOSTICS --------------------
 elif page == "Diagnostics":
     section("System Diagnostics", "HEALTH & FILES")
-    st.markdown("#### API connection")
+    st.markdown("#### Local inference engine")
     if health:
-        st.success("Backend API is responding.")
-        with st.expander('View Raw API Response', expanded=False):
-            st.json(health)
+        st.success("LSTM model checkpoint is available. Text inference runs locally on CPU.")
+        st.json(health)
     else:
-        st.error(f"Backend offline: {health_error}")
-        st.code(f"API base: {API_BASE}\nExpected health route: {API_BASE}/api/health")
-    st.markdown("#### Model registry response")
+        st.error(f"LSTM model unavailable: {health_error}")
+
+    st.markdown("#### Remote API")
+    st.warning("Remote FastAPI is not connected. Image and multimodal predictions, and API-dependent operations, are unavailable in this deployment.")
+    st.caption(f"Configured API address: {API_BASE}")
+
+    st.markdown("#### Available deployment model")
     if models:
-        with st.expander('View Raw API Response', expanded=False):
-            st.json(models)
-    else:
-        st.warning(f"Could not load /api/models: {models_error}")
+        st.json(models)
     st.markdown("#### Local project assets")
     checks = {
         "Processed samples CSV": sample_path,
