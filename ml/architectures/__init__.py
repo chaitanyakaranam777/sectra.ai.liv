@@ -1,39 +1,54 @@
-"""Model registry: ``build_model("cnn_bert", ...)``."""
+﻿"""Model registry with lazy architecture imports."""
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib import import_module
 from typing import Any
-
-from ml.architectures.base_model import BaseSentimentModel
-from ml.architectures.bert import BERTClassifier
-from ml.architectures.cnn import CNNClassifier
-from ml.architectures.cnn_bert import CNNBERTClassifier
-from ml.architectures.cnn_lstm import CNNLSTMClassifier
-from ml.architectures.lstm import LSTMClassifier
 
 
 @dataclass(frozen=True)
 class ModelSpec:
-    cls: type[BaseSentimentModel]
-    text_encoder: str | None  # "word" (LSTM vocabulary) | "bert" (WordPiece) | None (image-only)
+    module: str
+    class_name: str
+    text_encoder: str | None
     description: str
+
+    @property
+    def cls(self):
+        return getattr(import_module(self.module), self.class_name)
 
 
 MODEL_REGISTRY: dict[str, ModelSpec] = {
-    "cnn": ModelSpec(CNNClassifier, None, "CNN image-only classifier"),
-    "lstm": ModelSpec(LSTMClassifier, "word", "BiLSTM text-only classifier"),
-    "bert": ModelSpec(BERTClassifier, "bert", "BERT text-only classifier"),
-    "cnn_lstm": ModelSpec(CNNLSTMClassifier, "word", "CNN + BiLSTM multimodal fusion"),
-    "cnn_bert": ModelSpec(CNNBERTClassifier, "bert", "CNN + BERT multimodal fusion"),
+    "cnn": ModelSpec("ml.architectures.cnn", "CNNClassifier", None, "CNN image-only classifier"),
+    "lstm": ModelSpec("ml.architectures.lstm", "LSTMClassifier", "word", "BiLSTM text-only classifier"),
+    "bert": ModelSpec("ml.architectures.bert", "BERTClassifier", "bert", "BERT text-only classifier"),
+    "cnn_lstm": ModelSpec("ml.architectures.cnn_lstm", "CNNLSTMClassifier", "word", "CNN + BiLSTM multimodal fusion"),
+    "cnn_bert": ModelSpec("ml.architectures.cnn_bert", "CNNBERTClassifier", "bert", "CNN + BERT multimodal fusion"),
 }
 
 
-def build_model(name: str, **params: Any) -> BaseSentimentModel:
-    """Instantiate a registered architecture; unknown names raise ``KeyError`` listing the options."""
+def build_model(name: str, **params: Any):
+    """Instantiate a registered architecture only when requested."""
     if name not in MODEL_REGISTRY:
         raise KeyError(f"Unknown model '{name}'. Available: {sorted(MODEL_REGISTRY)}")
     return MODEL_REGISTRY[name].cls(**params)
 
 
-__all__ = ["MODEL_REGISTRY", "ModelSpec", "build_model", "BaseSentimentModel", "CNNClassifier",
-           "LSTMClassifier", "BERTClassifier", "CNNLSTMClassifier", "CNNBERTClassifier"]
+_LAZY_EXPORTS = {
+    "BaseSentimentModel": ("ml.architectures.base_model", "BaseSentimentModel"),
+    "CNNClassifier": ("ml.architectures.cnn", "CNNClassifier"),
+    "LSTMClassifier": ("ml.architectures.lstm", "LSTMClassifier"),
+    "BERTClassifier": ("ml.architectures.bert", "BERTClassifier"),
+    "CNNLSTMClassifier": ("ml.architectures.cnn_lstm", "CNNLSTMClassifier"),
+    "CNNBERTClassifier": ("ml.architectures.cnn_bert", "CNNBERTClassifier"),
+}
+
+
+def __getattr__(name: str):
+    if name not in _LAZY_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, class_name = _LAZY_EXPORTS[name]
+    return getattr(import_module(module_name), class_name)
+
+
+__all__ = ["MODEL_REGISTRY", "ModelSpec", "build_model", *_LAZY_EXPORTS]
