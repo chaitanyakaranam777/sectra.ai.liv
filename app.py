@@ -10,11 +10,19 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import requests
+from ml.inference.predictor import Predictor
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 ARTIFACTS = ROOT / "artifacts"
 API_BASE = os.getenv("SENTRA_API_URL", "http://127.0.0.1:8002").rstrip("/")
+
+CHECKPOINT_PATH = ROOT / "artifacts" / "runs" / "lstm_mvsa_single_v1" / "best.pt"
+
+@st.cache_resource
+def load_sentra_model():
+    return Predictor(str(CHECKPOINT_PATH), device="cpu")
+
 
 st.set_page_config(
     page_title="SENTRA AI | Intelligence Platform",
@@ -1238,13 +1246,9 @@ if page == "Overview":
                 st.warning("Enter some text first.")
             else:
                 try:
-                    response = requests.post(
-                        API_BASE + "/api/predict/text",
-                        json={"text": overview_text.strip()},
-                        timeout=45,
-                    )
-                    response.raise_for_status()
-                    result = response.json()
+                    predictor = load_sentra_model()
+                    result = predictor.predict(text=overview_text.strip())
+                    result["run_id"] = "lstm_mvsa_single_v1"
                     st.session_state["overview_prediction_result"] = result
                 except Exception as exc:
                     st.error(f"Prediction failed: {exc}")
@@ -1388,14 +1392,11 @@ elif page == "Prediction Lab":
         else:
             try:
                 if mode == "Text":
-                    payload = {"text": text_value.strip()}
-                    if run_id:
-                        payload["run_id"] = run_id
-                    response = requests.post(
-                        API_BASE + "/api/predict/text",
-                        json=payload,
-                        timeout=60,
-                    )
+                    predictor = load_sentra_model()
+                    result = predictor.predict(text=text_value.strip())
+                    result["run_id"] = "lstm_mvsa_single_v1"
+                    st.session_state["prediction_result"] = result
+                    st.success("Prediction completed successfully using SENTRA LSTM.")
                 else:
                     data = {"run_id": run_id} if run_id else {}
                     files = {
@@ -1417,10 +1418,9 @@ elif page == "Prediction Lab":
                         files=files,
                         timeout=90,
                     )
-
-                response.raise_for_status()
-                st.session_state["prediction_result"] = response.json()
-                st.success("Prediction completed successfully.")
+                    response.raise_for_status()
+                    st.session_state["prediction_result"] = response.json()
+                    st.success("Prediction completed successfully.")
 
             except requests.exceptions.HTTPError:
                 st.error(f"API error: HTTP {response.status_code}")
